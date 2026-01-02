@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Factor Allocation Model</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">₿</span>
+                    <div class="logo-text">
+                        <h1>Bitcoin Factor Model</h1>
+                        <span class="subtitle">PCA-Based Allocation Signals</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button id="refresh-btn" class="btn btn-primary">
+                        <span class="btn-icon">↻</span>
+                        Refresh Data
+                    </button>
+                    <div class="last-updated">
+                        <span class="label">Last updated:</span>
+                        <span id="last-updated-time" class="value">--</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Loading State -->
+            <div id="loading" class="loading-overlay">
+                <div class="loader">
+                    <div class="loader-spinner"></div>
+                    <p>Fetching market data...</p>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div id="error" class="error-banner hidden">
+                <span class="error-icon">⚠</span>
+                <span id="error-message">An error occurred</span>
+                <button id="error-dismiss" class="btn-link">Dismiss</button>
+            </div>
+
+            <!-- Signal Hero Section -->
+            <section class="signal-hero">
+                <div class="signal-card" id="signal-card">
+                    <div class="signal-main">
+                        <div class="signal-label">Current Signal</div>
+                        <div class="signal-value" id="signal-value">--</div>
+                        <div class="signal-zscore">
+                            Z-Score: <span id="zscore-value">--</span>
+                        </div>
+                    </div>
+                    <div class="signal-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Conviction</span>
+                            <span class="meta-value" id="conviction-value">--%</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Data Date</span>
+                            <span class="meta-value" id="data-date">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trend Filter Status -->
+                <div class="trend-filter-card">
+                    <div class="trend-header">
+                        <span class="trend-icon" id="trend-icon">📈</span>
+                        <span class="trend-title">50-Day EMA Trend Filter</span>
+                    </div>
+                    <div class="trend-body">
+                        <div class="price-row">
+                            <div class="price-item">
+                                <span class="price-label">BTC Price</span>
+                                <span class="price-value" id="btc-price">$--</span>
+                            </div>
+                            <div class="price-item">
+                                <span class="price-label">50 EMA</span>
+                                <span class="price-value" id="ema-price">$--</span>
+                            </div>
+                            <div class="price-item">
+                                <span class="price-label">Status</span>
+                                <span class="price-value status-badge" id="ema-status">--</span>
+                            </div>
+                        </div>
+                        <div class="filter-note" id="filter-note"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section class="charts-section">
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3>BTC Price & Regime Overlay</h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="price-chart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3>Composite Z-Score</h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="zscore-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Factor Breakdown Section -->
+            <section class="factors-section">
+                <div class="section-header">
+                    <h2>Factor Breakdown</h2>
+                    <p class="section-desc">PCA-weighted factors with Hurst-adjusted component signals</p>
+                </div>
+                <div class="factors-grid" id="factors-grid">
+                    <!-- Dynamically populated -->
+                </div>
+            </section>
+
+            <!-- Methodology Section -->
+            <section class="methodology-section">
+                <div class="methodology-card">
+                    <h3>Model Methodology</h3>
+                    <div class="methodology-content">
+                        <div class="methodology-item">
+                            <h4>Factor Weights (PCA)</h4>
+                            <p>Weights derived from principal component variance explained. 5 factors capture macro regime dynamics.</p>
+                        </div>
+                        <div class="methodology-item">
+                            <h4>Hurst Adjustment</h4>
+                            <p>Each component's signal is scaled by Hurst exponent (H/0.5). Trending markets (H>0.5) amplify signals, mean-reverting (H<0.5) dampen them.</p>
+                        </div>
+                        <div class="methodology-item">
+                            <h4>Trend Filter</h4>
+                            <p>50-day EMA filter prevents OVERWEIGHT signals when BTC is below trend, reducing false positives in downtrends.</p>
+                        </div>
+                        <div class="methodology-item">
+                            <h4>Signal Thresholds</h4>
+                            <p><strong>OVERWEIGHT:</strong> z > 0.35 &amp; above EMA<br>
+                            <strong>UNDERWEIGHT:</strong> z < -0.5<br>
+                            <strong>NEUTRAL:</strong> Between thresholds</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Bitcoin Factor Allocation Model &mdash; Based on PCA Factor Analysis</p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
