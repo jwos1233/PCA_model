@@ -366,12 +366,32 @@ function updateFactors(data) {
 }
 
 /**
- * Update last updated time
+ * Update last updated time and cache status
  */
-function updateLastUpdated() {
+function updateLastUpdated(cacheInfo) {
     const el = document.getElementById('last-updated-time');
-    const now = new Date();
-    el.textContent = now.toLocaleTimeString();
+
+    if (cacheInfo && cacheInfo.last_updated) {
+        const lastUpdated = new Date(cacheInfo.last_updated);
+        const now = new Date();
+        const diffMs = now - lastUpdated;
+        const diffMins = Math.floor(diffMs / 60000);
+
+        if (diffMins < 1) {
+            el.textContent = 'Just now';
+        } else if (diffMins < 60) {
+            el.textContent = `${diffMins}m ago`;
+        } else {
+            el.textContent = lastUpdated.toLocaleTimeString();
+        }
+
+        // Add cache indicator
+        if (cacheInfo.status === 'hit') {
+            el.title = `Cached data (expires ${new Date(cacheInfo.expires_at).toLocaleTimeString()})`;
+        }
+    } else {
+        el.textContent = new Date().toLocaleTimeString();
+    }
 }
 
 /**
@@ -429,9 +449,15 @@ async function fetchSignalData() {
         updatePriceChart(data);
         updateZscoreChart(data);
         updateFactors(data);
-        updateLastUpdated();
+        updateLastUpdated(data.cache);
 
         hideLoading();
+
+        // Update refresh button state
+        const refreshBtn = document.getElementById('refresh-btn');
+        if (data.cache && data.cache.status === 'hit') {
+            refreshBtn.innerHTML = '<span class="btn-icon">↻</span> Refresh';
+        }
 
     } catch (error) {
         console.error('Error fetching data:', error);
@@ -441,18 +467,65 @@ async function fetchSignalData() {
 }
 
 /**
+ * Force refresh data from APIs (bypasses cache)
+ */
+async function forceRefresh() {
+    const refreshBtn = document.getElementById('refresh-btn');
+    refreshBtn.innerHTML = '<span class="btn-icon pulse">↻</span> Refreshing...';
+    refreshBtn.disabled = true;
+
+    try {
+        // Trigger background refresh
+        await fetch('/api/refresh', { method: 'POST' });
+
+        // Poll for completion
+        let attempts = 0;
+        const maxAttempts = 60; // 60 seconds max
+
+        const pollInterval = setInterval(async () => {
+            attempts++;
+
+            try {
+                const statusResponse = await fetch('/api/cache/status');
+                const status = await statusResponse.json();
+
+                if (!status.is_refreshing) {
+                    clearInterval(pollInterval);
+                    refreshBtn.disabled = false;
+                    // Fetch fresh data
+                    await fetchSignalData();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(pollInterval);
+                    refreshBtn.innerHTML = '<span class="btn-icon">↻</span> Refresh';
+                    refreshBtn.disabled = false;
+                    showError('Refresh timed out. Try again.');
+                }
+            } catch (e) {
+                // Continue polling
+            }
+        }, 1000);
+
+    } catch (error) {
+        console.error('Error triggering refresh:', error);
+        refreshBtn.innerHTML = '<span class="btn-icon">↻</span> Refresh';
+        refreshBtn.disabled = false;
+        showError('Failed to refresh data');
+    }
+}
+
+/**
  * Initialize the application
  */
 function init() {
-    // Set up refresh button
+    // Set up refresh button - force refresh bypasses cache
     const refreshBtn = document.getElementById('refresh-btn');
-    refreshBtn.addEventListener('click', fetchSignalData);
+    refreshBtn.addEventListener('click', forceRefresh);
 
     // Set up error dismiss button
     const dismissBtn = document.getElementById('error-dismiss');
     dismissBtn.addEventListener('click', hideError);
 
-    // Initial data fetch
+    // Initial data fetch (uses cache if available)
     fetchSignalData();
 }
 
